@@ -12,30 +12,37 @@ const AudioCall = () => {
 
   useEffect(() => {
     // Set up WebSocket connection
-    socketRef.current = new WebSocket('ws://localhost:8080');
+    socketRef.current = new WebSocket('ws://52.66.202.16:8080');
 
-    socketRef.current.onmessage = (message) => {
-      const data = JSON.parse(message.data);
-
-      if (data.type === 'offer' && !peer) {
-        const newPeer = new SimplePeer({ initiator: false, trickle: false, stream });
-        setPeer(newPeer);
-
-        newPeer.on('signal', (signal) => {
-          socketRef.current.send(JSON.stringify({ type: 'answer', signal }));
-        });
-
-        newPeer.signal(data.signal);
-
-        newPeer.on('stream', (remoteStream) => {
-          remoteAudioRef.current.srcObject = remoteStream;
-        });
-
-        setConnected(true);
-      } else if (data.type === 'answer' && peer) {
-        peer.signal(data.signal);
+    socketRef.current.onmessage = async (message) => {
+      try {
+        const data = typeof message.data === 'string' 
+          ? JSON.parse(message.data) 
+          : JSON.parse(await message.data.text());
+    
+        if (data.type === 'offer' && !peer) {
+          const newPeer = new SimplePeer({ initiator: false, trickle: false, stream });
+          setPeer(newPeer);
+    
+          newPeer.on('signal', (signal) => {
+            socketRef.current.send(JSON.stringify({ type: 'answer', signal }));
+          });
+    
+          newPeer.signal(data.signal);
+    
+          newPeer.on('stream', (remoteStream) => {
+            remoteAudioRef.current.srcObject = remoteStream;
+          });
+    
+          setConnected(true);
+        } else if (data.type === 'answer' && peer) {
+          peer.signal(data.signal);
+        }
+      } catch (error) {
+        console.error('Error handling WebSocket message:', error);
       }
     };
+    
 
     // Clean up on unmount
     return () => {
